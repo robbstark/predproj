@@ -16,8 +16,9 @@ The data used for this project was provided as part of the publication "Wearable
 I obtain the data by downloading the relevant files to the current working directory and reading them into data frames:
 
 ```{r, cache=TRUE, warning=FALSE}
-#download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "training", method = "curl")
-#download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "testing", method="curl")
+setInternet2(TRUE)
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "training")
+download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "testing")
 training=read.csv("training")
 testing=read.csv("testing")
 ```
@@ -61,6 +62,7 @@ In order to accurately estimate the accuracy of the model I will use a cross val
 
 ```{r}
 library(caret)
+set.seed(11)
 inTrain <- createDataPartition(training$classe, p = 0.7,list = F)
 cValid <- training[-inTrain,]
 training <- training[inTrain,]
@@ -94,6 +96,7 @@ Since I have already cleaned the data I can run the model directly without using
 
 ```{r}
 library(randomForest)
+set.seed(1)
 fit1=randomForest(classe~.,data=training)
 fit1
 ```
@@ -101,13 +104,13 @@ fit1
 That looks like a good result.  I move on to evaluating the model.
 
 ##Evaluating the model
-The fitted model above is reporting an out-of-sample error rate of 0.31% which is excellent. The model took close to 2 minutes to execute which means I don't have to worry about using PCA to improve the performance.  I will now measure the out-of-bag accurage of the model using the cross validation dataset that I held out in the beginning.  I expect the two to be identical or extremely close since random forest automatically implements a cross validation methodology to estimate out-of-bag eror rate.
+The fitted model above is reporting an out-of-sample error rate of near 0.3% which is excellent. The model took close to 2 minutes to execute which means I don't have to worry about using PCA to improve the performance.  I will now measure the out-of-bag accurage of the model using the cross validation dataset that I held out in the beginning.  I expect the two to be identical or extremely close since random forest automatically implements a cross validation methodology to estimate out-of-bag eror rate.
 
 ```{r}
 confusionMatrix(cValid$classe, predict(fit1, cValid))
 ```
 
-As we can see the two are very close. I believe this is a very good model and no further improvement is necessary.
+As we can see the confusion matrix is reporting a ~99.7% accuracy rate which means the two methods of estimating error rates are very close. I believe this is a very good model and no further improvement is necessary.
 
 ##Conclusion
 I will now run the model against the testing dataset that is provided so I can predict the classes for each test case.  I first transform the testing data to match the cleaned format.
