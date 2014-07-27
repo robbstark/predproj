@@ -101,13 +101,13 @@ fit1
 That looks like a good result.  I move on to evaluating the model.
 
 ##Evaluating the model
-The fitted model above is reporting an out-of-sample error rate of 0.28% which is excellent. The model took close to 2 minutes to execute which means I don't have to worry about using PCA to improve the performance.  I will now measure the out-of-bag accurage of the model using the cross validation dataset that I held out in the beginning.  I expect the two to be identical or extremely close since random forest automatically implements a cross validation methodology to estimate out-of-bag eror rate.
+The fitted model above is reporting an out-of-sample error rate of 0.31% which is excellent. The model took close to 2 minutes to execute which means I don't have to worry about using PCA to improve the performance.  I will now measure the out-of-bag accurage of the model using the cross validation dataset that I held out in the beginning.  I expect the two to be identical or extremely close since random forest automatically implements a cross validation methodology to estimate out-of-bag eror rate.
 
 ```{r}
 confusionMatrix(cValid$classe, predict(fit1, cValid))
 ```
 
-As we can see the two are idenitical. I believe this is a very good model and no further improvement is necessary.
+As we can see the two are very close. I believe this is a very good model and no further improvement is necessary.
 
 ##Conclusion
 I will now run the model against the testing dataset that is provided so I can predict the classes for each test case.  I first transform the testing data to match the cleaned format.
