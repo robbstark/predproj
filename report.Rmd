@@ -1,0 +1,126 @@
+---
+title: "Predicting Wightlifting Exercise Form"
+author: "RobbStark"
+date: "Sunday, July 27, 2014"
+output: html_document
+---
+
+##Executive Summary:
+This paper describes the methodology and the steps taken in order to build a prediction model to determine how weightlifting exercises were performed using persoal activity monitoring devices.  
+
+During the course of this project I have built a highly accurate model using the RandomForest algorithm and utilized a cross validation set to independently measure the accuracy of prediction on out-of-bag samples.  The final model has an accuracy rate of ~99.7% and accurately predicted all the testing set observations.
+
+##The data
+The data used for this project was provided as part of the publication "Wearable Computing: Accelerometers' Data Classification of Body Postures and Movements".  It includes 160 variables that were collected using sensors on three different attached to the subjects.  
+
+I obtain the data by downloading the relevant files to the current working directory and reading them into data frames:
+
+```{r, cache=TRUE, warning=FALSE}
+#download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", destfile = "training", method = "curl")
+#download.file("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", destfile = "testing", method="curl")
+training=read.csv("training")
+testing=read.csv("testing")
+```
+
+##Cleaning the data
+
+A routine examination of the data (using summary(), output not shown) reveals many predictors are mostly consisting of NA's aside from a few aggregate data point.  We need to remove such fields.
+
+```{r}
+naCount <- sapply(training, function(x) sum(is.na(x)))
+naCols <- names(naCount[!naCount==19216])
+training <- subset(training, select=naCols)
+```
+
+We also need to remove the predictors that consist almost entirely of empty values as well.
+
+```{r}
+emCount <- sapply(training, function(x) sum(as.character(x)==""))
+emCols <- names(emCount[!emCount==19216])
+training <- subset(training, select=emCols)
+```
+
+And finally we remove the time/date fields, the "new window" field, and the X field which is an index.
+
+```{r}
+training <- training[,-c(3:6)]
+training <- training[,-1]
+```
+
+I have chosen to include the username of the subject performing the exercises.  This is a tricky situation where we could either include or exclude the username based on the intended final usage of the model.  Including the username increases the accuracy of the prediction for current subjects but it will make it impossible to generalize the model to the larger population.  On the other hand, removing the usernames makes it easy to generalize the model to the larger population but reduces the model accuracy since it will have to model the noise that exists because different subjects in the training data have some variations in how they perform the same form of the exercises.
+
+For the purpose of this exercise, and the fact that I need to predict 2 testing observations involving only the test subjects, I have decided to include username in my model. The final dataset looks as follows:
+
+```{r}
+dim(training)
+summary(training)
+```
+
+##Creating a Cross Validation Set
+In order to accurately estimate the accuracy of the model I will use a cross validation data set.  Since we have a relatively large number of data, I will use 70% of the data to train the model and use the remaining 30% to test the prediction accuracy of the model. I will do this before I do any data analysis and I will make sure that all data exploration and analysis is done only on the training set.  The cross validation will be used only once to measure the accuracy of the model.  This is done to make sure the model does not overfit to the cross validation set and therefore generates an unbiased accuracy measure.
+
+```{r}
+library(caret)
+inTrain <- createDataPartition(training$classe, p = 0.7,list = F)
+cValid <- training[-inTrain,]
+training <- training[inTrain,]
+dim(training);dim(cValid)
+```
+
+##Analyzing the data
+At this time I do some exploratory analysis on the data to see what I can find out about the relationships between various variables.  I start by looking at the frequency of each classe.
+
+```{r}
+qplot(training$classe)
+```
+
+We can see that there is a bit of difference in tehe frequency of different outcomes which makes splitting of training/cross validation sets a but tricky, however, this doesn't concern me as the createDataPartition command of the caret package will preserve this ratio between partitions.
+
+I would usually use command such as plot, pairs, featurePlot, etc to look at the relationships between different predictors as well as response, however, we have too many variables and the resulting plots too cramped to be useful.  Instead I look at the correlation between numeric predictors to see if there are highly correlated variables.  Since we have over 2750 pairs, for improved visibility, I only look at the number of variables that are correlated with eachother higher than +/- 70%.
+
+```{r}
+sum(abs(round(cor(training[-c(1,55)]), 1))>0.7)
+```
+
+As we can see there are a considerable number of pairs of variables with high correlation.  This would concern me greatly if I were building an explanatory model since this would cause confounding and multi-colinearity.  However, I am not overly concerned since I am building a predictive model.  Later on I will revisit this issue once I build a model and inspect its out-of-bag predictive power.
+
+Another issue that I will revisit later is that of Principal Component Analysis (PCA).  We have a large number of observations and a large number of predictors.  Given that I only have a laptop with modest performance I may not be able to run a model using all the above predictors in a reasonable duration of time. If that proves to be the case, I will use PCA to reduce the number of variables to improve performance, which will come at the cost of losing some information which may impact accuracy.  Right now though I will try to build a model without PCA to try to get the maximum predictive accuracy.
+
+##Creating A model
+
+I have chosen to start my work by using Random Forest to build a model.  Random Forest is a great classifier and should give very good results.  If not, I will explore other algorithms to see if I can get better performance.  
+
+Since I have already cleaned the data I can run the model directly without using the preprocessing and other functionality provided by caret package.
+
+```{r}
+library(randomForest)
+fit1=randomForest(classe~.,data=training)
+fit1
+```
+
+That looks like a good result.  I move on to evaluating the model.
+
+##Evaluating the model
+The fitted model above is reporting an out-of-sample error rate of 0.28% which is excellent. The model took close to 2 minutes to execute which means I don't have to worry about using PCA to improve the performance.  I will now measure the out-of-bag accurage of the model using the cross validation dataset that I held out in the beginning.  I expect the two to be identical or extremely close since random forest automatically implements a cross validation methodology to estimate out-of-bag eror rate.
+
+```{r}
+confusionMatrix(cValid$classe, predict(fit1, cValid))
+```
+
+As we can see the two are idenitical. I believe this is a very good model and no further improvement is necessary.
+
+##Conclusion
+I will now run the model against the testing dataset that is provided so I can predict the classes for each test case.  I first transform the testing data to match the cleaned format.
+
+```{r}
+colnames(testing)[160] <- "classe"
+testing <- subset(testing, select=naCols)
+testing <- subset(testing, select=emCols)
+testing <- testing[,-c(3:6)]
+testing <- testing[,-1]
+predict(fit1, testing)
+```
+
+The results were all correct as confirmed by the coursera autograder.
+
+The above report documents building of a single model that worked almost perfectly immediately.  In reality a data scientist will need to develop several models and perform many feature selection for each of them to arrive at the best model. In that scenario a cross validation dataset makes a lot more sense since it can be used across different models to understand the generalization error rate among them.
